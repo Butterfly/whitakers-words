@@ -32,6 +32,8 @@ with Ada.Strings.Fixed;
 with Words_Engine.Explanation_Package; use Words_Engine.Explanation_Package;
 use Latin_Utils;
 
+with GNATCOLL.JSON; use GNATCOLL;
+
 pragma Elaborate (Support_Utils.Word_Parameters);
 package body Words_Engine.Parse
 is
@@ -1169,7 +1171,9 @@ is
       procedure Put_Analysis (A_Cursor : Result_Container.Cursor) is
          Analysis : constant Word_Analysis := Element (Position => A_Cursor);
          type File_Type_Access is access constant Ada.Text_IO.File_Type;
+
          O : File_Type_Access;
+
       begin
          if Words_Mode (Write_Output_To_File) then
             O := Output'Access;
@@ -1180,9 +1184,7 @@ is
          List_Stems (Configuration, O.all, Analysis, Undashed);
       end Put_Analysis;
 
-      procedure Print_Analyses
-        (Analyses : Result_Container.Vector)
-      is
+      procedure Print_Analyses (Analyses : Result_Container.Vector) is
       begin
          Analyses.Iterate (Process => Put_Analysis'Access);
       end Print_Analyses;

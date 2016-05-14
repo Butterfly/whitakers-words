@@ -37,7 +37,7 @@ package Words_Engine.List_Package is
 
    procedure List_Stems (Configuration :    Configuration_Type;
                          Output        :    Ada.Text_IO.File_Type;
-                         WA            :    Word_Analysis;
+                         The_Analysis            :    Word_Analysis;
                          Input_Line    :    String);
 
    procedure Unknown_Search (Unknown       :  in String;
