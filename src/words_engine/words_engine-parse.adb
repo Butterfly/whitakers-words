@@ -32,7 +32,7 @@ with Ada.Strings.Fixed;
 with Words_Engine.Explanation_Package; use Words_Engine.Explanation_Package;
 use Latin_Utils;
 
-with GNATCOLL.JSON; use GNATCOLL;
+-- with GNATCOLL.JSON; use GNATCOLL;
 
 pragma Elaborate (Support_Utils.Word_Parameters);
 package body Words_Engine.Parse
