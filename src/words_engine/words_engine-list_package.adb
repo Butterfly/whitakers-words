@@ -598,13 +598,28 @@ package body Words_Engine.List_Package is
       end if;
    end Do_Pause;
 
+   procedure Put_A_Form (The_Analysis : Word_Analysis;
+                         Output : Ada.Text_IO.File_Type;
+                         J : Integer;
+                         Sra : Stem_Inflection_Array) is
+   begin
+      if J = The_Analysis.Dict'First or else
+        Support_Utils.Dictionary_Form (The_Analysis.Dict (J).De) /=
+          Support_Utils.Dictionary_Form (The_Analysis.Dict (J - 1).De)
+      then
+         --  Put at first chance, skip duplicates
+         Put_Form (Output, Sra (1), The_Analysis.Dict (J));
+      end if;
+   end Put_A_Form;
+
    procedure Put_Parse_Details
      (Configuration : Configuration_Type;
       Output        : Ada.Text_IO.File_Type;
-      WA            : Word_Analysis;
-      Xp            : in out Explanations)
+      The_Analysis  : Word_Analysis;
+      The_Explanations : in out Explanations)
    is
       Mm            : constant Integer := Get_Max_Meaning_Size (Output);
+
    begin
       --TEXT_IO.PUT_LINE ("PUTting INFLECTIONS");
       declare
@@ -612,15 +627,15 @@ package body Words_Engine.List_Package is
            := Null_Sra;
       begin
 
-         pragma Assert (WA.Dict'First = WA.Stem'First);
+         pragma Assert (The_Analysis.Dict'First = The_Analysis.Stem'First);
 
          Output_Loop :
-         for J in WA.Dict'Range loop
+         for J in The_Analysis.Dict'Range loop
             declare
-               Sra : constant Stem_Inflection_Array := WA.Stem (J);
+               Sra : constant Stem_Inflection_Array := The_Analysis.Stem (J);
             begin
                -- hack to work around static/dynamic schizophrenia
-               if WA.Dict (J) = Null_Dictionary_MNPC_Record then
+               if The_Analysis.Dict (J) = Null_Dictionary_MNPC_Record then
                   exit Output_Loop;
                end if;
 
@@ -633,10 +648,10 @@ package body Words_Engine.List_Package is
                        Null_Stem_Inflection_Record;
 
                      Put_Inflection (Configuration, Output, Sra (K),
-                       WA.Dict (J));
+                       The_Analysis.Dict (J));
                      if Sra (K).Stem (1 .. 3) = "PPL"  then
-                        Ada.Text_IO.Put_Line (Output,
-                                              Head (Xp.Ppp_Meaning, Mm));
+                        Ada.Text_IO.Put_Line
+                          (Output, Head (The_Explanations.Ppp_Meaning, Mm));
                      end if;
                   end loop Put_Inflection_Array_J;
                   Osra := Sra;
@@ -644,31 +659,33 @@ package body Words_Engine.List_Package is
 
                Putting_Form :
                begin
-                  if J = WA.Dict'First or else
-                    Support_Utils.Dictionary_Form (WA.Dict (J).De) /=
-                    Support_Utils.Dictionary_Form (WA.Dict (J - 1).De)
-                  then
-                     --  Put at first chance, skip duplicates
-                     Put_Form (Output, Sra (1), WA.Dict (J));
-                  end if;
+                  Put_A_Form (The_Analysis => The_Analysis,
+                              Output => Output,
+                              J   => J,
+                              Sra => Sra);
                end Putting_Form;
 
                Putting_Meaning :
                begin
-                  if WA.Dict (J).D_K in General .. Unique then
-                     if J + 1 > WA.Dict'Last or else
-                       WA.Dict (J).De.Mean /= WA.Dict (J + 1).De.Mean
+                  if The_Analysis.Dict (J).D_K in General .. Unique then
+                     if J + 1 > The_Analysis.Dict'Last or else
+                       The_Analysis.Dict (J).De.Mean
+                       /= The_Analysis.Dict (J + 1).De.Mean
                      then
                         --  Hhandle simple multiple MEAN with same IR and FORM
                         --  by anticipating duplicates and waiting until change
-                        Put_Meaning_Line (Output, Sra (1), WA.Dict (J), Mm, Xp);
+                        Put_Meaning_Line
+                          (Output, Sra (1), The_Analysis.Dict (J), Mm,
+                           The_Explanations);
                      end if;
                   else
-                     Put_Meaning_Line (Output, Sra (1), WA.Dict (J), Mm, Xp);
+                     Put_Meaning_Line
+                       (Output, Sra (1), The_Analysis.Dict (J), Mm,
+                        The_Explanations);
                   end if;
                end Putting_Meaning;
 
-               Do_Pause (Output, WA.I_Is_Pa_Last);
+               Do_Pause (Output, The_Analysis.I_Is_Pa_Last);
             end;
          end loop Output_Loop;
       end;
@@ -911,17 +928,17 @@ package body Words_Engine.List_Package is
    procedure List_Stems
      (Configuration : Configuration_Type;
       Output        : Ada.Text_IO.File_Type;
-      WA            : Word_Analysis;
+      The_Analysis  : Word_Analysis;
       Input_Line    : String)
    is
-      Var_Xp : Explanations := WA.Xp;
-      Raw_Word : constant String := To_String (WA.The_Word);
+      Var_Xp : Explanations := The_Analysis.Xp;
+      Raw_Word : constant String := To_String (The_Analysis.The_Word);
    begin
       --  Sets + if capitalized
       --  Strangely enough, it may enter LIST_STEMS with PA_LAST /= 0
       --  but be weeded and end up with no parse after
       --                    LIST_SWEEP  -  PA_LAST = 0
-      if WA.Unknowns then
+      if The_Analysis.Unknowns then
          --  WORD failed
          List_Unknowns (Input_Line, Raw_Word);
       end if;
@@ -931,9 +948,9 @@ package body Words_Engine.List_Package is
          return;
       end if;
 
-      Put_Parse_Details (Configuration, Output, WA, Var_Xp);
+      Put_Parse_Details (Configuration, Output, The_Analysis, Var_Xp);
 
-      if WA.Was_Trimmed then
+      if The_Analysis.Was_Trimmed then
          Ada.Text_IO.Put (Output, '*');
       end if;
       Ada.Text_IO.New_Line (Output);

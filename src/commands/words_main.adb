@@ -20,146 +20,77 @@ with Latin_Utils.Strings_Package; use Latin_Utils.Strings_Package;
 use Latin_Utils;
 with Latin_Utils.Config; use Latin_Utils.Config;
 with Support_Utils.Word_Parameters; use Support_Utils.Word_Parameters;
-with Words_Engine.Word_Package; use Words_Engine.Word_Package;
 with Words_Engine.Initialization;
-with Process_Input;
+with Input_Processor;
+with Ada.Exceptions; use Ada;
 
 procedure Words_Main (Configuration : Configuration_Type) is
-   Input_Line  : String (1 .. 250) := (others => ' ');
-   Arguments_Start : Integer := 1;
+   Argument_Error : exception;
 
 begin
-   --  The language shift in argumants must take place here
-   --  since later parsing of line ignores non-letter Characters
-   -- configuration := developer_version;
+   Suppress_Preface := True;
+   Words_Engine.Initialization.Initialize_Engine;
 
-   -- The main mode of usage for WORDS is a simple call, followed by
-   -- screen interaction.
-   if Ada.Command_Line.Argument_Count = 0  then      --  Simple WORDS
-      Method := Interactive;                          --  Interactive
-      Suppress_Preface := False;
-      Set_Output (Ada.Text_IO.Standard_Output);
-      Words_Engine.Initialization.Initialize_Engine;
-      Process_Input (Configuration);
+   if 1 <= Ada.Command_Line.Argument_Count
+     and Ada.Command_Line.Argument_Count < 3
+   then
+      At_Least_One_Argument :
+      declare
+         Input_Name : constant String := Trim (Ada.Command_Line.Argument (1));
+         --Single parameter: an Input file.
+         --WORDS infile
+      begin
+         --  Try file name, not raises NAME_ERROR
+         Open (Input, In_File, Input_Name);
+         Method := Command_Line_Files;
+         Set_Input (Input);
 
-      --But there are other, command line options.
-      --WORDS may be called with Arguments on the same line,
-      --in a number of different modes.
-      --
-   else
-      Suppress_Preface := True;
-      Words_Engine.Initialization.Initialize_Engine;
-
-      --Single parameter, either a simple Latin word or an Input file.
-      --WORDS amo
-      --WORDS infile
-      if Ada.Command_Line.Argument_Count = 1  then      --  InPut 1 word in-line
-         One_Argument :
-         declare
-            Input_Name  : constant String :=
-              Trim (Ada.Command_Line.Argument (1));
-         begin
-            --  Try file name, not raises NAME_ERROR
-            Open (Input, In_File, Input_Name);
-            Method := Command_Line_Files;
-            Set_Input (Input);
-            Set_Output (Ada.Text_IO.Standard_Output);
-            --  No additional Arguments, so just go to PARSE now
-            Process_Input (Configuration);
-         exception                  --  Triggers on INPUT
-            when Name_Error  =>                 --  Raised NAME_ERROR therefore
-               Method := Command_Line_Input;    --  Found word in command line
-         end One_Argument;
+         if Ada.Command_Line.Argument_Count = 1  then
+            One_Argument :
+            begin
+               Set_Output (Ada.Text_IO.Standard_Output);
+               Input_Processor.Process_Input (Configuration);
+            end One_Argument;
 
          --With two Arguments the options are: Inputfile and Outputfile,
-         --two Latin words, or a language shift to English (Latin being
-         --the startup default)
-
-         --and an English  word (with no part of speech).
          --WORDS infile outfile
-         --WORDS amo amas
-         --WORDS ^e  love
-      elsif Ada.Command_Line.Argument_Count = 2 then --  INPUT and OUTPUT files
-         Two_Arguments :                             --  or multiwords in-line
-         declare
-            Input_Name  : constant String :=
-              Trim (Ada.Command_Line.Argument (1));
-            Output_Name : constant String :=
-              Trim (Ada.Command_Line.Argument (2));
-         begin
-            if Input_Name (1) = Change_Language_Character  then
-               if Input_Name'Length > 1 then
-                  Change_Language (Input_Name (2));
-                  Arguments_Start := 2;
-                  Method := Command_Line_Input;      --  Parse the one word
-               end if;
-            else
-               Open (Input, In_File, Input_Name);
+         elsif Ada.Command_Line.Argument_Count = 2 then -- INPUT and OUTPUT
+            Two_Arguments :
+            declare
+               Output_Name : constant String :=
+                 Trim (Ada.Command_Line.Argument (2));
+            begin
                Create (Output, Out_File, Output_Name);
-               Method := Command_Line_Files;
-
-               Set_Input (Input);
                Set_Output (Output);
 
-               Suppress_Preface := True;
                Output_Screen_Size := Integer'Last;
                --  No additional Arguments, so just go to PARSE now
-               Process_Input (Configuration);
+               Input_Processor.Process_Input (Configuration);
 
-               Set_Input (Ada.Text_IO.Standard_Input);    --  Clean up
-               Set_Output (Ada.Text_IO.Standard_Output);
                Close (Output);
-            end if;
-         exception                  --  Triggers on either INPUT or OUTPUT  !!!
-            when Name_Error  =>
-               Method := Command_Line_Input;   --  Found words in command line
+            exception                            --  Triggers on OUTPUT  !!!
+               when NE : Name_Error  =>          --  Raised NAME_ERROR therefore
+                  Ada.Text_IO.Put_Line
+                    (Ada.Text_IO.Standard_Error,
+                     Ada.Exceptions.Exception_Message (NE));
 
-         end Two_Arguments;
+            end Two_Arguments;
+         end if;
 
-         --With three Arguments there could be three Latin words
-         -- or a language shift
-         --and and English word and part of speech.
-         --WORDS amo amas amat
-         --WORDS ^e love v
-      elsif Ada.Command_Line.Argument_Count = 3  then
-         --  INPUT and OUTPUT files or multiwords in-line
-         Three_Arguments :
-         declare
-            Arg1 : constant String := Trim (Ada.Command_Line.Argument (1));
-            -- we probably don't need to define these for their side-effects
-            -- arg2 : constant String := Trim (Ada.Command_Line.Argument (2));
-            -- arg3 : constant String := Trim (Ada.Command_Line.Argument (3));
-         begin
-            if Arg1 (1) = Change_Language_Character  then
-               if Arg1'Length > 1 then
-                  Change_Language (Arg1 (2));
-                  Arguments_Start := 2;
-                  Method := Command_Line_Input;      --  Parse the one word
-               end if;
-            else
-               Method := Command_Line_Input;
-            end if;
-         end Three_Arguments;
+      exception                  --  Triggers on INPUT
+         when NE : Name_Error  =>          --  Raised NAME_ERROR therefore
+            Ada.Text_IO.Put_Line
+              (Ada.Text_IO.Standard_Error,
+               Ada.Exceptions.Exception_Message (NE));
+      end At_Least_One_Argument;
 
-         --More than three Arguments must all be Latin words.
-         --WORDS amo amas amat amamus amatis amant
-      else    --  More than three Arguments
+   elsif Ada.Command_Line.Argument_Count = 0 then
+      Set_Input (Ada.Text_IO.Standard_Input);
+      Set_Output (Ada.Text_IO.Standard_Output);
+      Input_Processor.Process_Input (Configuration);
 
-         Method := Command_Line_Input;
-      end if;
-
-      if Method = Command_Line_Input  then   --  Process words in command line
-         More_Arguments :
-         begin
-            Suppress_Preface := True;
-            --  Assemble Input words
-            for I in Arguments_Start .. Ada.Command_Line.Argument_Count  loop
-               Input_Line := Head (
-                 Trim (Input_Line) & " " & Ada.Command_Line.Argument (I), 250);
-            end loop;
-            --Ada.TEXT_IO.PUT_LINE ("To PARSE >" & TRIM (INPUT_LINE));
-            Process_Input (Configuration, Trim (Input_Line));
-         end More_Arguments;
-      end if;
+   else    --  More than three Arguments
+         Exceptions.Raise_Exception
+           (Argument_Error'Identity, "Too many arguments");
    end if;
 end Words_Main;
