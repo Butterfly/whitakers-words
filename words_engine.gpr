@@ -1,5 +1,4 @@
 with "support_utils.gpr";
-with "gnatcoll";
 
 project Words_Engine is
 
